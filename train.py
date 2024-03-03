@@ -8,6 +8,7 @@ from tqdm import tqdm
 import os
 import numpy as np
 import logging
+import time  # Import the time module
 
 import warnings
 warnings.filterwarnings("ignore")
@@ -18,7 +19,7 @@ def parse_arguments():
     # Add arguments
     parser.add_argument('--data_dir', type=str, required=True, default='CUB_200_2011/images', help='Path to the directory containing the training data')
     parser.add_argument('--batch_size', type=int, default=256, help='Batch size for training')
-    parser.add_argument('--num_epochs', type = int, default=15, help='Number of epochs')
+    parser.add_argument('--num_epochs', type=int, default=15, help='Number of epochs')
     parser.add_argument('--output_dir', type=str, required=True, help='Path to output directory')
     
     # Parse arguments
@@ -27,7 +28,6 @@ def parse_arguments():
     return args
 
 if __name__ == '__main__':
-
     # Get arguments from command line
     args = parse_arguments()
 
@@ -36,7 +36,7 @@ if __name__ == '__main__':
     os.makedirs(os.path.join(args.output_dir, 'weights'), exist_ok=True)
 
     # Set up logging
-    logging.basicConfig(filename = os.path.join(args.output_dir, 'logs.txt'), level = logging.INFO, format = '%(message)s')
+    logging.basicConfig(filename=os.path.join(args.output_dir, 'logs.txt'), level=logging.INFO, format='%(message)s')
 
     # Start the training
     device = "cuda" if torch.cuda.is_available() else "cpu"
@@ -56,14 +56,16 @@ if __name__ == '__main__':
 
     step_scheduler = torch.optim.lr_scheduler.StepLR(optimizer, step_size=4, gamma=0.96)
 
-    training_history = {'accuracy':[],'loss':[]}
-    test_history = {'accuracy':[],'loss':[]}
-    
+    training_history = {'accuracy': [], 'loss': []}
+    test_history = {'accuracy': [], 'loss': []}
+
+    total_training_time = 0
     best_acc = 0.0
     iter_num = 0
 
-    for epoch in range(1, args.num_epochs+1):
-        
+    for epoch in range(1, args.num_epochs + 1):
+        start_time_epoch = time.time()  # Record start time for the epoch
+
         logging.info('Starting Epoch {}/{}'.format(epoch, args.num_epochs))
         print('Epoch {}/{}'.format(epoch, args.num_epochs))
         print('-' * 10)
@@ -78,7 +80,7 @@ if __name__ == '__main__':
         for inputs, labels in tqdm(train_dataloader):
             inputs = inputs.to(device)
             labels = labels.to(device)
-            
+
             # Step of optimization
             optimizer.zero_grad()
             logits = model(inputs)
@@ -95,31 +97,19 @@ if __name__ == '__main__':
 
         # LR Step after each epoch
         step_scheduler.step()
-        
+
+        # Calculate and store time taken for the epoch
+        end_time_epoch = time.time()
+        epoch_time = end_time_epoch - start_time_epoch
+        print(f'Time taken for Epoch {epoch}: {epoch_time:.2f} seconds')
+        logging.info(f'Time taken for Epoch {epoch}: {epoch_time:.2f} seconds')
+
+        total_training_time += epoch_time
+
         # Store logs
         training_history['accuracy'].append(train_acc / train_data_size)
         training_history['loss'].append(train_loss / train_data_size)
         print('Train Accuracy: {:.4f} Train Loss: {:.4f}'.format(train_acc / train_data_size, train_loss / train_data_size))
-
-        # Starting the test phase
-        model.eval()
-
-        test_loss = 0
-        test_acc = 0
-
-        for inputs, labels in tqdm(test_dataloader):
-            inputs = inputs.to(device)
-            labels = labels.to(device)
-
-            optimizer.zero_grad()
-
-            with torch.no_grad():
-                outputs = model(inputs)
-                _, predicted = torch.max(outputs, 1)
-                loss = criterion(outputs, labels)
-
-            test_loss += loss.item() * inputs.size(0)   
-            test_acc += torch.sum(predicted == labels.data)
 
         weights_path = os.path.join(args.output_dir, 'weights', f'epoch_{epoch}.pth')
         torch.save(model.state_dict(), weights_path)
@@ -129,4 +119,8 @@ if __name__ == '__main__':
                       Train Accuracy: {train_acc / train_data_size}, \
                       Train Loss: {train_loss / train_data_size}')
         
-        logging.info(50*'-')
+        logging.info(50 * '-')
+
+    # Calculate and print total time taken for training
+    print(f'Total time taken for training: {total_training_time:.2f} seconds')
+    logging.info(f'Total time taken for training: {total_training_time:.2f} seconds')

@@ -56,8 +56,8 @@ if __name__ == '__main__':
 
     step_scheduler = torch.optim.lr_scheduler.StepLR(optimizer, step_size=4, gamma=0.96)
 
-    training_history = {'accuracy': [], 'loss': []}
-    test_history = {'accuracy': [], 'loss': []}
+    training_accuracy = []
+    training_loss = []
 
     total_training_time = 0
     best_acc = 0.0
@@ -107,8 +107,8 @@ if __name__ == '__main__':
         total_training_time += epoch_time
 
         # Store logs
-        training_history['accuracy'].append(train_acc / train_data_size)
-        training_history['loss'].append(train_loss / train_data_size)
+        training_accuracy.append(train_acc / train_data_size)
+        training_loss.append(train_loss / train_data_size)
         print('Train Accuracy: {:.4f} Train Loss: {:.4f}'.format(train_acc / train_data_size, train_loss / train_data_size))
 
         weights_path = os.path.join(args.output_dir, 'weights', f'epoch_{epoch}.pth')
